@@ -4,8 +4,8 @@ import rasterio.mask
 from pyproj import CRS, Transformer
 from scipy.interpolate import griddata
 import numpy as np
+import json
 
-from .geojson import read_polygon
 
 def calc_volume(input_dem, pts=None, pts_epsg=None, geojson_polygon=None,
                 interp_method='cubic', decimals=4):
@@ -72,12 +72,34 @@ def calc_volume(input_dem, pts=None, pts_epsg=None, geojson_polygon=None,
         diff = rast_dem - base
         volume = np.nansum(diff) * px_area
 
-        return np.round(volume, decimals=decimals)
-
         # import matplotlib.pyplot as plt
         # fig, ax = plt.subplots()
-        # ax.imshow(rast_dem)
+        # ax.imshow(diff)
         # plt.scatter(xs, ys, c=zs, cmap='viridis', s=50, edgecolors='k')
         # plt.colorbar(label='Z values')
         # plt.title('Debug')
         # plt.show()
+
+        return np.round(volume, decimals=decimals)
+
+
+def read_polygon(file):
+    with open(file, 'r', encoding="utf-8") as f:
+        data = json.load(f)
+
+    if data.get('type') == "FeatureCollection":
+        features = data.get("features", [{}])
+    else:
+        features = [data]
+
+    for feature in features:
+        if not 'geometry' in feature:
+            continue
+
+        # Check if the feature geometry type is Polygon
+        if feature['geometry']['type'] == 'Polygon':
+            # Extract polygon coordinates
+            coordinates = feature['geometry']['coordinates'][0]  # Assuming exterior ring
+            return coordinates
+    
+    raise IOError("No polygons found in %s" % file)
