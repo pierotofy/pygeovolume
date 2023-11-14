@@ -33,7 +33,7 @@ def calc_volume(input_dem, pts=None, pts_epsg=None, geojson_polygon=None, decima
     src_crs.ImportFromEPSG(pts_epsg)
     transformer = osr.CoordinateTransformation(src_crs, crs)
 
-    dem_pts = [transformer.TransformPoint(p[1], p[0]) for p in pts]
+    dem_pts = [list(transformer.TransformPoint(p[1], p[0]))[:2] for p in pts]
     
     # Some checks
     if len(dem_pts) < 2:
@@ -43,9 +43,8 @@ def calc_volume(input_dem, pts=None, pts_epsg=None, geojson_polygon=None, decima
     if not np.array_equal(dem_pts[0], dem_pts[-1]):
         dem_pts.append(dem_pts[0])
     
-    dem_pts = np.array(dem_pts)
-
     polygon = {"coordinates": [dem_pts], "type": "Polygon"}
+    dem_pts = np.array(dem_pts)
 
     # Remove last point (loop close)
     dem_pts = dem_pts[:-1]
@@ -62,10 +61,11 @@ def calc_volume(input_dem, pts=None, pts_epsg=None, geojson_polygon=None, decima
 
         # X/Y coordinates in transform coordinates
         ys, xs = np.array(rasterio.transform.rowcol(transform, dem_pts[:,0], dem_pts[:,1]))
-        zs = rast_dem[ys,xs]
 
         if np.any(xs<0) or np.any(xs>=w) or np.any(ys<0) or np.any(ys>=h):
             raise ValueError("Points are out of bounds")
+
+        zs = rast_dem[ys,xs]
         
         if base_method == "plane":
             # Create a grid for interpolation
