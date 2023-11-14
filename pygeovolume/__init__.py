@@ -1,2 +1,2 @@
 name = "pygeovolume"
-from .calculate import calc_volume
+from .volume import calc_volume
