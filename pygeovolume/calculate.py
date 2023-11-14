@@ -2,13 +2,12 @@ import os
 import rasterio
 import rasterio.mask
 from pyproj import CRS, Transformer
-from scipy.interpolate import griddata
+from scipy.optimize import curve_fit
 import numpy as np
 import json
 
 
-def calc_volume(input_dem, pts=None, pts_epsg=None, geojson_polygon=None,
-                interp_method='cubic', decimals=4):
+def calc_volume(input_dem, pts=None, pts_epsg=None, geojson_polygon=None, decimals=4):
     if not os.path.isfile(input_dem):
         raise ValueError(f"{input_dem} does not exist")
 
@@ -66,19 +65,27 @@ def calc_volume(input_dem, pts=None, pts_epsg=None, geojson_polygon=None,
         x_grid, y_grid = np.meshgrid(np.linspace(0, w - 1, w), np.linspace(0, h - 1, h))
 
         # Perform spline interpolation using griddata
-        base = np.round(griddata(np.column_stack((xs, ys)), zs, (x_grid, y_grid), method=interp_method), decimals=9)
+        # from scipy.interpolate import griddata
+        # base = np.round(griddata(np.column_stack((xs, ys)), zs, (x_grid, y_grid), method='linear'), decimals=9)
+        
+        # Perform curve fitting
+        linear_func = lambda xy, m1, m2, b: m1 * xy[0] + m2 * xy[1] + b
+        params, covariance = curve_fit(linear_func, np.vstack((xs, ys)), zs)
+
+        base = np.round(linear_func((x_grid, y_grid), *params), decimals=9)
+        base[np.isnan(rast_dem)] = np.nan
 
         # Calculate volume
         diff = rast_dem - base
         volume = np.nansum(diff) * px_area
 
-        # import matplotlib.pyplot as plt
-        # fig, ax = plt.subplots()
-        # ax.imshow(diff)
-        # plt.scatter(xs, ys, c=zs, cmap='viridis', s=50, edgecolors='k')
-        # plt.colorbar(label='Z values')
-        # plt.title('Debug')
-        # plt.show()
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots()
+        ax.imshow(base)
+        plt.scatter(xs, ys, c=zs, cmap='viridis', s=50, edgecolors='k')
+        plt.colorbar(label='Z values')
+        plt.title('Debug')
+        plt.show()
 
         return np.round(volume, decimals=decimals)
 
